@@ -6,6 +6,6 @@ router = APIRouter()
 def health_check():
     return {
   "status": "healthy",
-  "database": "connected",
+  "databasgite": "connected",
   "crawler": "available"
 }
