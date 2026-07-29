@@ -11,7 +11,7 @@ def create_source(source: SourceCreate, db: Session = Depends(get_db)):
     new_source = Source(
         name=source.name,
         base_url=source.base_url,
-        enabled_status=source.enabled_status,
+        enabled_status=source.enabled_status, 
         request_delay=source.request_delay
     )
     db.add(new_source)
@@ -50,3 +50,4 @@ def update_source_status(source_id: int,enabled:bool, db: Session = Depends(get_
     db.commit()
     db.refresh(existing)
     return existing
+

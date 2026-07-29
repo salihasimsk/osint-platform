@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime , ForeignKey
 from sqlalchemy.sql import func
 from app.database.database import Base
+from sqlalchemy.orm import relationship
 
 class Advisory(Base):
 
@@ -14,8 +15,11 @@ class Advisory(Base):
     cve = Column(String,nullable=True, index=True)
     product = Column(String, nullable=True)
     severity = Column(String, nullable=True, index=True)
-    summmary = Column(Text, nullable=True)
+    summary = Column(Text, nullable=True)
     collection_date = Column(DateTime(timezone=True), server_default=func.now())
-    crawl_job_id = Column(Integer, nullable=True, index=True)
+    
+    crawl_job_id = Column(Integer, ForeignKey("crawl_jobs.id"), nullable=True, index=True)  
+    crawl_job= relationship('CrawlJob', back_populates='advisories')  
+    
     
     

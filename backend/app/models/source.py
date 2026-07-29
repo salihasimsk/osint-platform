@@ -14,6 +14,3 @@ class Source(Base):
     updated_date = Column(DateTime(timezone=True), onupdate=func.now())
     last_crawl_date = Column(DateTime(timezone=True), nullable=True)
     
-    
-    
-    
