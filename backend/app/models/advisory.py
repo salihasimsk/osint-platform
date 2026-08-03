@@ -21,5 +21,5 @@ class Advisory(Base):
     crawl_job_id = Column(Integer, ForeignKey("crawl_jobs.id"), nullable=True, index=True)  
     crawl_job= relationship('CrawlJob', back_populates='advisories')  
     
-    
+
     

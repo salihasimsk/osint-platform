@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer,String, JSON, DateTime
+from sqlalchemy import Column, Integer,String, JSON, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from app.database.database import Base
 from sqlalchemy.orm import relationship
@@ -16,5 +16,8 @@ class CrawlJob(Base):
     started_date = Column(DateTime(timezone=True), nullable=True)
     completed_date = Column(DateTime(timezone=True), nullable=True)
     
-    advisories = relationship('Advisory', back_populates='crawl_job', cascade="all, delete-orphan")
+    advisories = relationship('Advisory', back_populates='crawl_job')
     crawl_logs = relationship('CrawlLog', back_populates='crawl_job', cascade="all, delete-orphan")
+    
+    source_id = Column(Integer, ForeignKey("sources.id"), nullable=False, index=True)
+    source = relationship('Source', back_populates='crawl_jobs')
