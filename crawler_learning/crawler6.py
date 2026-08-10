@@ -1,6 +1,7 @@
 import httpx,json,time,logging
 from bs4 import BeautifulSoup
 from urllib.robotparser import RobotFileParser
+from urllib.parse import urljoin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,6 +83,22 @@ def get_next_page(html):
         next_url = next_button.find("a")["href"]   # /page/2/
         return "https://quotes.toscrape.com" + next_url
     return None
+
+def get_links(html):
+    soup = BeautifulSoup(html,"html.parser")
+    links=soup.find_all("a")
+    
+    valid_links =set()
+    
+    
+    for link in links:
+        href = link.get("href")
+        full_url = urljoin("https://quotes.toscrape.com/",href)
+        
+        
+        if full_url.startswith("https://quotes.toscrape.com"):   #full_url şu adresle başlıyor mu -- domain filtresi
+            valid_links.add(full_url)
+    return valid_links
     
 def save_json(data):
 
@@ -103,21 +120,44 @@ def crawl(url):
 """
 
 def crawl(url):
+    
+    max_urls=3
+    url_count=0
+    
+    visited_urls = set()
+    
     if check_robots(url):
         logging.info("bot urlyi ziyaret edebilir")
         
         all_quotes = []
         logging.info(f"Crawl başladı: {url}")
         
-        while url:
+        while url and url_count <= max_urls:
+            
+            if url in visited_urls:
+                logging.info(f"URL daha önce ziyaret edildi: {url}")
+                break
+
+            visited_urls.add(url)
+            url_count += 1
+            
             html = fetch_page(url)
             
             if html:
                 quotes = parse_quotes(html)
                 all_quotes.extend(quotes)
+
                 logging.info(f"Sayfada {len(quotes)} veri bulundu")
+
+                links = get_links(html)
+                new_links = links - visited_urls
+
+                if new_links:
+                    url = next(iter(new_links))
+
                 time.sleep(2)
-                url = get_next_page(html)
+                
+
             else:
                 break
         
@@ -128,7 +168,13 @@ def crawl(url):
         else:
              logging.warning("Hiç veri bulunamadı.")    
 
+
 crawl(url)
+
+html = fetch_page(url)
+links = get_links(html)
+#print(links)
+
 
 """   
 html = fetch_page(url)
