@@ -1,28 +1,29 @@
-from urllib.parse import urlparse
+import logging
+import httpx
 from urllib.robotparser import RobotFileParser
+from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 
-class RobotsChecker:
-    def __init__(self, user_agent="OSINT-Platform-Crawler/1.0"):
-        self.user_agent = user_agent
+def can_crawl(url: str, user_agent: str = "osint-crawler") -> bool:
+    """Check whether the given URL is allowed to be crawled according to robots.txt."""
+    try:
+        parsed = urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        robots_url = f"{base}/robots.txt"
 
-    def can_fetch(self, url):
-        parsed_url = urlparse(url)
+        # Download robots.txt ourselves with a timeout
+        response = httpx.get(robots_url, timeout=10)
+        response.raise_for_status()
 
-        robots_url = (
-            f"{parsed_url.scheme}://"
-            f"{parsed_url.netloc}/robots.txt"
-        )
-
+        # Feed the downloaded content into the parser
         rp = RobotFileParser()
-        rp.set_url(robots_url)
+        rp.parse(response.text.splitlines())
 
-        try:
-            rp.read()
-        except Exception:
-            return False
+        return rp.can_fetch(user_agent, url)
 
-        return rp.can_fetch(
-            self.user_agent,
-            url
-        )
+    except Exception as e:
+        logger.warning(f"Could not read robots.txt ({url}): {e}")
+        return False
+    
