@@ -38,3 +38,7 @@ def update_source_status(db: Session, source, enabled: bool):
     db.commit()
     db.refresh(source)
     return source
+
+def delete_source(db: Session, source):
+    db.delete(source)
+    db.commit()

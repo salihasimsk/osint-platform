@@ -26,3 +26,7 @@ def update_source(source_id: int, source: SourceCreate, db: Session = Depends(ge
 @router.patch("/sources/{source_id}/status", response_model=SourceResponse)
 def update_source_status(source_id: int, enabled: bool, db: Session = Depends(get_db)):
     return source_service.update_source_status(db, source_id, enabled)
+
+@router.delete("/sources/{source_id}")
+def delete_source(source_id: int, db: Session = Depends(get_db)):
+    return source_service.delete_source(db, source_id)

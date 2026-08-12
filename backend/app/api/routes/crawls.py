@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -9,8 +9,22 @@ router = APIRouter()
 
 
 @router.post("/crawls", response_model=CrawlJobResponse)
-def start_crawl(crawl: CrawlJobCreate, db: Session = Depends(get_db)):
-    return crawl_job_service.start_crawl(db, crawl)
+def start_crawl(
+    crawl: CrawlJobCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    job = crawl_job_service.start_crawl(db, crawl)
+
+    for source_id in crawl.source_ids:
+         background_tasks.add_task(
+        crawl_job_service.execute_crawl_job,
+        job.job_id,
+        source_id,
+        crawl.maximum_pages,
+        )
+
+    return job
 
 
 @router.get("/crawls", response_model=list[CrawlJobResponse])

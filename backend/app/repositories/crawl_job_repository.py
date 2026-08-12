@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime,timezone  
 from app.models.crawl_job import CrawlJob
 
 
@@ -20,9 +20,10 @@ def get_crawl_by_job_id(db: Session, job_id: str):
     return db.query(CrawlJob).filter(CrawlJob.job_id == job_id).first()
 
 
-def create_crawl(db: Session, job_id: str, configuration):
+def create_crawl(db, job_id, source_id, configuration):
     new_job = CrawlJob(
         job_id=job_id,
+        source_id=source_id,
         status="queued",
         configuration=configuration,
     )
@@ -34,6 +35,40 @@ def create_crawl(db: Session, job_id: str, configuration):
 
 def update_crawl_status(db: Session, job, status: str):
     job.status = status
+    db.commit()
+    db.refresh(job)
+    return job
+
+def start_crawl_job(db: Session, job):
+    job.status = "running"
+    job.started_date = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def complete_crawl(
+    db: Session,
+    job,
+    pages_visited: int,
+    records_extracted: int,
+):
+    job.status = "completed"
+    job.progress = 100
+    job.pages_visited = pages_visited
+    job.records_extracted = records_extracted
+    job.completed_date = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def fail_crawl(db: Session, job):
+    job.status = "failed"
+    job.error_count += 1
+    job.completed_date = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(job)
     return job

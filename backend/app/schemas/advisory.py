@@ -11,7 +11,7 @@ class AdvisoryBase(BaseModel):
     product: str | None = None
     severity: str | None = None
     summary: str | None = None
-    craw_job_id: int | None = None
+    crawl_job_id: int | None = None
     
 
 class AdvisoryCreate(AdvisoryBase):
