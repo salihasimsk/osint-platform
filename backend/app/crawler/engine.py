@@ -1,9 +1,11 @@
+import time
 import logging
 
 import httpx
 
 from app.crawler.rate_limiter import RateLimiter
 from app.crawler.robots import can_crawl
+from app.crawler.url_validator import is_safe_url
 
 
 logger = logging.getLogger(__name__)
@@ -21,14 +23,17 @@ class CrawlerEngine:
         self.rate_limiter = RateLimiter(request_delay)
         self.pages_visited = 0
 
-    def fetch_page(self, url: str) -> str | None:
-        """Download and return the HTML content of a permitted page."""
+    def fetch_page(self, url: str, max_retries: int = 3) -> str | None:
+        """Download a page's HTML, retrying on temporary failures."""
+
+        # SSRF protection: block localhost, private IPs, unsafe schemes
+        if not is_safe_url(url):
+            logger.warning("Unsafe URL blocked (SSRF protection): %s", url)
+            return None
 
         if not can_crawl(url, self.user_agent):
             logger.warning("robots.txt does not allow crawling: %s", url)
             return None
-
-        self.rate_limiter.wait()
 
         headers = {
             "User-Agent": self.user_agent,
@@ -38,33 +43,49 @@ class CrawlerEngine:
             ),
         }
 
-        try:
-            response = httpx.get(
-                url,
-                headers=headers,
-                timeout=10,
-                follow_redirects=True,
-            )
+        for attempt in range(1, max_retries + 1):
+            self.rate_limiter.wait()
 
-            response.raise_for_status()
-            return response.text
+            try:
+                response = httpx.get(
+                    url,
+                    headers=headers,
+                    timeout=10,
+                    follow_redirects=True,
+                )
+                response.raise_for_status()
+                return response.text
 
-        except httpx.TimeoutException:
-            logger.error("Request timed out: %s", url)
-            return None
+            except httpx.HTTPStatusError as error:
+                status = error.response.status_code
+                # Retry on temporary server errors (5xx) or rate limiting (429)
+                if status in (429, 500, 502, 503, 504) and attempt < max_retries:
+                    wait_time = attempt * 3
+                    logger.warning(
+                        "Temporary error %s for %s. Retry %s/%s after %ss",
+                        status, url, attempt, max_retries, wait_time,
+                    )
+                    time.sleep(wait_time)
+                    continue
+                logger.error("HTTP error %s while requesting %s", status, url)
+                return None
 
-        except httpx.HTTPStatusError as error:
-            logger.error(
-                "HTTP error %s while requesting %s",
-                error.response.status_code,
-                url,
-            )
-            return None
+            except httpx.TimeoutException:
+                if attempt < max_retries:
+                    logger.warning("Timeout for %s. Retry %s/%s", url, attempt, max_retries)
+                    continue
+                logger.error("Request timed out: %s", url)
+                return None
 
-        except httpx.RequestError as error:
-            logger.error("Request failed for %s: %s", url, error)
-            return None
-        
+            except httpx.RequestError as error:
+                if attempt < max_retries:
+                    logger.warning("Connection error for %s. Retry %s/%s", url, attempt, max_retries)
+                    continue
+                logger.error("Request failed for %s: %s", url, error)
+                return None
+
+        return None
+
     def crawl(self, start_url, parser, max_pages: int = 5) -> list[dict]:
         """Crawl starting from start_url using the given parser."""
         visited = set()
@@ -73,7 +94,6 @@ class CrawlerEngine:
         page_count = 0
 
         while url and page_count < max_pages:
-            # Avoid visiting the same URL twice
             if url in visited:
                 logger.info("Already visited: %s", url)
                 break
@@ -81,12 +101,10 @@ class CrawlerEngine:
 
             logger.info("Crawling page %s: %s", page_count + 1, url)
 
-            # Download the page (robots + rate limit + fetch)
             html = self.fetch_page(url)
             if html is None:
                 break
 
-            # Parse advisories from the page
             records = parser.parse(html, url)
             all_results.extend(records)
             logger.info("Extracted %s records", len(records))
@@ -94,7 +112,6 @@ class CrawlerEngine:
             page_count += 1
             self.pages_visited = page_count
 
-            # Find the next page
             url = parser.get_next_page(html, url)
 
         logger.info(

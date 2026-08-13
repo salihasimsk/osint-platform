@@ -5,8 +5,8 @@ from app.repositories import crawl_job_repository
 from app.repositories import advisory_repository
 from app.crawler.engine import CrawlerEngine
 from app.crawler.parsers.ubuntu_parser import UbuntuParser
-
-
+from app.crawler.parsers.cert_parser import CertParser
+from app.repositories import crawl_log_repository
 
 def start_crawl(db: Session, crawl_data):
     job_id = crawl_job_repository.generate_job_id(db)
@@ -31,12 +31,18 @@ def stop_crawl(db: Session, job_id: str):
         raise HTTPException(status_code=404, detail="Crawl job not found")
     return crawl_job_repository.update_crawl_status(db, job, "stopped")
 
+def get_parser_for_source(source):
+    """Choose the correct parser based on the source domain."""
+    if "ubuntu.com" in source.base_url:
+        return UbuntuParser()
+    elif "kb.cert.org" in source.base_url:
+        return CertParser()
+    else:
+        raise ValueError(f"No parser available for source: {source.base_url}")
 
-def run_crawl(db: Session, source,crawl_job_id: int, max_pages: int = 3):
-    """Run the crawler for a source, save advisories, skip duplicates."""
-    parser = UbuntuParser()
+def run_crawl(db, source, crawl_job_id, max_pages=3):
+    parser = get_parser_for_source(source)
     engine = CrawlerEngine(request_delay=source.request_delay)
-
     collected = engine.crawl(source.base_url, parser, max_pages=max_pages)
 
     saved_count = 0
@@ -45,24 +51,19 @@ def run_crawl(db: Session, source,crawl_job_id: int, max_pages: int = 3):
     for advisory_data in collected:
         advisory_data["crawl_job_id"] = crawl_job_id
 
-        existing = advisory_repository.get_advisory_by_url(
-            db,
-            advisory_data["url"],
-        )
+        # If the advisory has no CVE yet, try to fetch it from the detail page
+        if not advisory_data.get("cve") and hasattr(parser, "parse_detail"):
+            detail_html = engine.fetch_page(advisory_data["url"])
+            if detail_html:
+                detail_data = parser.parse_detail(detail_html)
+                advisory_data["cve"] = detail_data.get("cve")
 
+        existing = advisory_repository.get_advisory_by_url(db, advisory_data["url"])
         if existing:
-            advisory_repository.update_advisory_from_crawl(
-                db,
-                existing,
-                advisory_data,
-            )
+            advisory_repository.update_advisory_from_crawl(db, existing, advisory_data)
             skipped_count += 1
             continue
-
-        advisory_repository.create_advisory(
-            db,
-            advisory_data,
-        )
+        advisory_repository.create_advisory(db, advisory_data)
         saved_count += 1
 
     return {
@@ -73,7 +74,6 @@ def run_crawl(db: Session, source,crawl_job_id: int, max_pages: int = 3):
     }
     
 def execute_crawl_job(job_id: str, source_id: int, max_pages: int = 3):
-    """Run the full crawl in the background with its own DB session."""
     from app.database.database import SessionLocal
     from app.repositories import source_repository
 
@@ -86,22 +86,38 @@ def execute_crawl_job(job_id: str, source_id: int, max_pages: int = 3):
             return
 
         crawl_job_repository.start_crawl_job(db, job)
+        # Update the source's last crawl date
+        source_repository.update_last_crawl_date(db, source)
+        crawl_log_repository.create_log(
+            db,
+            message=f"Crawl started for {source.name}",
+            log_level="info",
+            source=source.name,
+            crawl_job_id=job.id,
+        )
 
         try:
-            result = run_crawl(
-                db=db,
-                source=source,
-                crawl_job_id=job.id,
-                max_pages=max_pages,
-            )
-
+            result = run_crawl(db=db, source=source, crawl_job_id=job.id, max_pages=max_pages)
             crawl_job_repository.complete_crawl(
-                db=db,
-                job=job,
+                db=db, job=job,
                 pages_visited=result["pages_visited"],
                 records_extracted=result["collected"],
             )
-        except Exception:
+            crawl_log_repository.create_log(
+                db,
+                message=f"Crawl completed. Pages: {result['pages_visited']}, Saved: {result['saved']}, Skipped: {result['skipped']}",
+                log_level="info",
+                source=source.name,
+                crawl_job_id=job.id,
+            )
+        except Exception as e:
             crawl_job_repository.fail_crawl(db, job)
+            crawl_log_repository.create_log(
+                db,
+                message=f"Crawl failed: {str(e)}",
+                log_level="error",
+                source=source.name,
+                crawl_job_id=job.id,
+            )
     finally:
         db.close()

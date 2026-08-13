@@ -5,6 +5,7 @@ from app.database.database import get_db
 from app.schemas.crawl_job import CrawlJobCreate, CrawlJobResponse
 from app.services import crawl_job_service
 
+
 router = APIRouter()
 
 
@@ -17,13 +18,12 @@ def start_crawl(
     job = crawl_job_service.start_crawl(db, crawl)
 
     for source_id in crawl.source_ids:
-         background_tasks.add_task(
-        crawl_job_service.execute_crawl_job,
-        job.job_id,
-        source_id,
-        crawl.maximum_pages,
+        background_tasks.add_task(
+            crawl_job_service.execute_crawl_job,
+            job.job_id,
+            source_id,
+            crawl.maximum_pages,
         )
-
     return job
 
 

@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.source import Source
+from datetime import datetime, timezone
+
 
 
 def get_all_sources(db: Session):
@@ -42,3 +44,9 @@ def update_source_status(db: Session, source, enabled: bool):
 def delete_source(db: Session, source):
     db.delete(source)
     db.commit()
+    
+def update_last_crawl_date(db, source):
+    source.last_crawl_date = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(source)
+    return source

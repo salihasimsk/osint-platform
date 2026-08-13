@@ -219,3 +219,12 @@ __marimo__/
 
 *.db
 osint.db
+
+# Task brief
+Build a Python-Based OSINT Web Crawler.docx
+
+# Test/experiment scripts
+backend/test_ubuntu.py
+backend/test_cert.py
+backend/app/crawler/robots_test.py
+backend/app/crawler/run_ubuntu_parser.py
