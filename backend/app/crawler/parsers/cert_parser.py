@@ -34,8 +34,17 @@ class CertParser(BaseParser):
             # The VU# id is in the 4th cell (index 3)
             vu_id = cells[3].get_text(strip=True)
 
-            # The published date is in the 2nd cell (index 1)
-            publication_date = cells[1].get_text(strip=True)
+            publication_date_text = cells[1].get_text(strip=True)
+            publication_date = None
+
+            if publication_date_text:
+                try:
+                    publication_date = datetime.strptime(
+                    publication_date_text,
+                    "%Y-%m-%d",
+                )
+                except ValueError:
+                    publication_date = None
 
             results.append({
                 "title": f"{vu_id}: {title}" if vu_id else title,

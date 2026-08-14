@@ -1,12 +1,13 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
+from app.repositories import crawl_log_repository
 from app.repositories import crawl_job_repository
 from app.repositories import advisory_repository
 from app.crawler.engine import CrawlerEngine
 from app.crawler.parsers.ubuntu_parser import UbuntuParser
 from app.crawler.parsers.cert_parser import CertParser
-from app.repositories import crawl_log_repository
+from app.crawler.parsers.cisa_kev_parser import CisaKevParser
+
 
 def start_crawl(db: Session, crawl_data):
     job_id = crawl_job_repository.generate_job_id(db)
@@ -37,6 +38,8 @@ def get_parser_for_source(source):
         return UbuntuParser()
     elif "kb.cert.org" in source.base_url:
         return CertParser()
+    elif "raw.githubusercontent.com/cisagov/kev-data" in source.base_url:
+        return CisaKevParser()
     else:
         raise ValueError(f"No parser available for source: {source.base_url}")
 
@@ -111,6 +114,7 @@ def execute_crawl_job(job_id: str, source_id: int, max_pages: int = 3):
                 crawl_job_id=job.id,
             )
         except Exception as e:
+            db.rollback()
             crawl_job_repository.fail_crawl(db, job)
             crawl_log_repository.create_log(
                 db,

@@ -1,5 +1,5 @@
 from app.crawler.parsers.ubuntu_parser import UbuntuParser
-
+from datetime import datetime
 
 SAMPLE_HTML = """
 <html>
@@ -57,7 +57,7 @@ def test_parse():
     assert notice["url"] == (
         "https://ubuntu.com/security/notices/USN-1234-1"
     )
-    assert notice["publication_date"] == "12 August 2026"
+    assert notice["publication_date"] == datetime(2026, 8, 12)
     assert notice["summary"] == (
         "An example security issue was fixed."
     )
