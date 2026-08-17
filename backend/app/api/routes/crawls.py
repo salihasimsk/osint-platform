@@ -9,21 +9,27 @@ from app.services import crawl_job_service
 router = APIRouter()
 
 
-@router.post("/crawls", response_model=CrawlJobResponse)
+@router.post(
+    "/crawls",
+    response_model=CrawlJobResponse,
+)
 def start_crawl(
     crawl: CrawlJobCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    job = crawl_job_service.start_crawl(db, crawl)
+    job = crawl_job_service.start_crawl(
+        db,
+        crawl,
+    )
 
-    for source_id in crawl.source_ids:
-        background_tasks.add_task(
-            crawl_job_service.execute_crawl_job,
-            job.job_id,
-            source_id,
-            crawl.maximum_pages,
-        )
+    background_tasks.add_task(
+        crawl_job_service.execute_crawl_job,
+        job.job_id,
+        crawl.source_ids,
+        crawl.maximum_pages,
+    )
+
     return job
 
 

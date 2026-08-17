@@ -23,7 +23,7 @@ def count_advisories_with_unknown_severity(db: Session):
     return db.query(Advisory).filter(
         Advisory.severity.is_(None)
     ).count()
-    
+
 def count_advisories_by_organization(db: Session):
     rows = (
         db.query(

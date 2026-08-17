@@ -17,9 +17,6 @@ class Advisory(Base):
     severity = Column(String, nullable=True, index=True)
     summary = Column(Text, nullable=True)
     collection_date = Column(DateTime(timezone=True), server_default=func.now())
-    
-    crawl_job_id = Column(Integer, ForeignKey("crawl_jobs.id"), nullable=True, index=True)  
-    crawl_job= relationship('CrawlJob', back_populates='advisories')  
-    
 
-    
+    crawl_job_id = Column(Integer, ForeignKey("crawl_jobs.id"), nullable=True, index=True)
+    crawl_job= relationship('CrawlJob', back_populates='advisories')

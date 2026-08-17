@@ -1,18 +1,32 @@
-from sqlalchemy import create_engine 
-from sqlalchemy.orm import sessionmaker, declarative_base
- 
-DATABASE_URL = "sqlite:///./osint.db"
+import os
 
-engine  = create_engine(
-    DATABASE_URL,
-    connect_args = {"check_same_thread": False}
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./osint.db",
 )
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
 Base = declarative_base()
 
-#dependency
+
 def get_db():
+    """Provide a database session for FastAPI dependencies."""
     db = SessionLocal()
+
     try:
         yield db
     finally:

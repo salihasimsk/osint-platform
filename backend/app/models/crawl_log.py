@@ -12,8 +12,6 @@ class CrawlLog(Base):
     message = Column(Text, nullable=False)
     source = Column(String, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     crawl_job_id = Column(Integer, ForeignKey("crawl_jobs.id"), index=True, nullable=True)
     crawl_job = relationship("CrawlJob", back_populates="crawl_logs")
-    
-    

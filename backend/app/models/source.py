@@ -14,6 +14,5 @@ class Source(Base):
     created_date = Column(DateTime(timezone=True), server_default=func.now())
     updated_date = Column(DateTime(timezone=True), onupdate=func.now())
     last_crawl_date = Column(DateTime(timezone=True), nullable=True)
-    
+
     crawl_jobs = relationship('CrawlJob', back_populates='source')
-    

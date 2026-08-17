@@ -2,7 +2,7 @@ from pydantic import BaseModel,ConfigDict
 from datetime import datetime
 
 class AdvisoryBase(BaseModel):
-    title: str 
+    title: str
     organization: str
     publication_date: datetime | None = None
     url: str
@@ -12,7 +12,7 @@ class AdvisoryBase(BaseModel):
     severity: str | None = None
     summary: str | None = None
     crawl_job_id: int | None = None
-    
+
 
 class AdvisoryCreate(AdvisoryBase):
     pass

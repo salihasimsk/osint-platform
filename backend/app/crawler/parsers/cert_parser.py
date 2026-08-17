@@ -68,7 +68,7 @@ class CertParser(BaseParser):
         if not href:
             return None
         return urljoin(current_url, href)
-    
+
     def parse_detail(self, html: str) -> dict:
         """Extract extra fields (CVE) from a detail page."""
         soup = BeautifulSoup(html, "html.parser")

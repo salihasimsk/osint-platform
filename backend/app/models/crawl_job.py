@@ -15,9 +15,9 @@ class CrawlJob(Base):
     configuration = Column(JSON, nullable=True)
     started_date = Column(DateTime(timezone=True), nullable=True)
     completed_date = Column(DateTime(timezone=True), nullable=True)
-    
+
     advisories = relationship('Advisory', back_populates='crawl_job')
     crawl_logs = relationship('CrawlLog', back_populates='crawl_job', cascade="all, delete-orphan")
-    
+
     source_id = Column(Integer, ForeignKey("sources.id"), nullable=False, index=True)
     source = relationship('Source', back_populates='crawl_jobs')
