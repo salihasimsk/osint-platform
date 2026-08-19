@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 import {
   getAdvisories,
+  getAdvisoriesCsvUrl,
   type AdvisoryFilters,
 } from "../api/advisories";
 import type { Advisory } from "../types";
@@ -27,6 +28,16 @@ function AdvisoriesPage() {
   const [keyword, setKeyword] = useState("");
   const [organization, setOrganization] = useState("");
   const [severity, setSeverity] = useState("");
+  const [sourceDomain, setSourceDomain] = useState("");
+
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const [sortBy, setSortBy] =
+    useState("publication_date");
+
+  const [sortOrder, setSortOrder] =
+    useState<"asc" | "desc">("desc");
 
   const [appliedFilters, setAppliedFilters] =
     useState<AdvisoryFilters>({});
@@ -38,8 +49,6 @@ function AdvisoriesPage() {
       ...appliedFilters,
       page,
       page_size: PAGE_SIZE,
-      sort_by: "publication_date",
-      sort_order: "desc",
     })
       .then((data) => {
         if (isActive) {
@@ -73,25 +82,52 @@ function AdvisoriesPage() {
   ) {
     event.preventDefault();
 
-    setIsLoading(true);
     setError(null);
     setPage(1);
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setError(
+        "Date from cannot be later than Date to.",
+      );
+      return;
+    }
+
+    setIsLoading(true);
 
     setAppliedFilters({
       keyword: keyword.trim(),
       organization,
       severity,
+      source_domain: sourceDomain,
+      date_from: dateFrom,
+      date_to: dateTo,
+      sort_by: sortBy,
+      sort_order: sortOrder,
     });
   }
 
   function clearFilters() {
     setIsLoading(true);
     setError(null);
+
     setKeyword("");
     setOrganization("");
     setSeverity("");
+    setSourceDomain("");
+
+    setDateFrom("");
+    setDateTo("");
+
+    setSortBy("publication_date");
+    setSortOrder("desc");
+
     setPage(1);
     setAppliedFilters({});
+  }
+
+  function exportCsv() {
+    window.location.href =
+      getAdvisoriesCsvUrl(appliedFilters);
   }
 
   return (
@@ -133,12 +169,29 @@ function AdvisoriesPage() {
               setOrganization(event.target.value);
             }}
           >
-            <option value="">All organizations</option>
-            <option value="Ubuntu">Ubuntu</option>
-            <option value="CERT/CC">CERT/CC</option>
-            <option value="CISA">CISA</option>
-            <option value="NVD">NVD</option>
-            <option value="Red Hat">Red Hat</option>
+            <option value="">
+              All organizations
+            </option>
+
+            <option value="Ubuntu">
+              Ubuntu
+            </option>
+
+            <option value="CERT/CC">
+              CERT/CC
+            </option>
+
+            <option value="CISA">
+              CISA
+            </option>
+
+            <option value="NVD">
+              NVD
+            </option>
+
+            <option value="Red Hat">
+              Red Hat
+            </option>
           </select>
         </label>
 
@@ -151,12 +204,142 @@ function AdvisoriesPage() {
               setSeverity(event.target.value);
             }}
           >
-            <option value="">All severities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="moderate">Moderate</option>
-            <option value="low">Low</option>
+            <option value="">
+              All severities
+            </option>
+
+            <option value="critical">
+              Critical
+            </option>
+
+            <option value="high">
+              High
+            </option>
+
+            <option value="medium">
+              Medium
+            </option>
+
+            <option value="moderate">
+              Moderate
+            </option>
+
+            <option value="low">
+              Low
+            </option>
+          </select>
+        </label>
+
+        <label>
+          <span>Source</span>
+
+          <select
+            value={sourceDomain}
+            onChange={(event) => {
+              setSourceDomain(event.target.value);
+            }}
+          >
+            <option value="">
+              All sources
+            </option>
+
+            <option value="ubuntu.com">
+              Ubuntu
+            </option>
+
+            <option value="kb.cert.org">
+              CERT/CC
+            </option>
+
+            <option value="cisa.gov">
+              CISA
+            </option>
+
+            <option value="nvd.nist.gov">
+              NVD
+            </option>
+
+            <option value="access.redhat.com">
+              Red Hat
+            </option>
+          </select>
+        </label>
+
+        <label>
+          <span>Date from</span>
+
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(event) => {
+              setDateFrom(event.target.value);
+            }}
+          />
+        </label>
+
+        <label>
+          <span>Date to</span>
+
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(event) => {
+              setDateTo(event.target.value);
+            }}
+          />
+        </label>
+
+        <label>
+          <span>Sort by</span>
+
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value);
+            }}
+          >
+            <option value="publication_date">
+              Publication date
+            </option>
+
+            <option value="collection_date">
+              Collection date
+            </option>
+
+            <option value="title">
+              Title
+            </option>
+
+            <option value="organization">
+              Organization
+            </option>
+
+            <option value="severity">
+              Severity
+            </option>
+          </select>
+        </label>
+
+        <label>
+          <span>Sort order</span>
+
+          <select
+            value={sortOrder}
+            onChange={(event) => {
+              setSortOrder(
+                event.target.value as
+                  | "asc"
+                  | "desc",
+              );
+            }}
+          >
+            <option value="desc">
+              Descending
+            </option>
+
+            <option value="asc">
+              Ascending
+            </option>
           </select>
         </label>
 
@@ -174,12 +357,25 @@ function AdvisoriesPage() {
         >
           Clear
         </button>
+
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={exportCsv}
+        >
+          Export CSV
+        </button>
       </form>
 
-      {isLoading && <p>Loading advisories...</p>}
+      {isLoading && (
+        <p>Loading advisories...</p>
+      )}
 
       {error && (
-        <p className="error-message" role="alert">
+        <p
+          className="error-message"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -196,12 +392,33 @@ function AdvisoriesPage() {
             <table>
               <thead>
                 <tr>
-                  <th scope="col">Title</th>
-                  <th scope="col">Organization</th>
-                  <th scope="col">Severity</th>
-                  <th scope="col">CVE</th>
-                  <th scope="col">Product</th>
-                  <th scope="col">Published</th>
+                  <th scope="col">
+                    Title
+                  </th>
+
+                  <th scope="col">
+                    Organization
+                  </th>
+
+                  <th scope="col">
+                    Severity
+                  </th>
+
+                  <th scope="col">
+                    CVE
+                  </th>
+
+                  <th scope="col">
+                    Product
+                  </th>
+
+                  <th scope="col">
+                    Published
+                  </th>
+
+                  <th scope="col">
+                    Collected
+                  </th>
                 </tr>
               </thead>
 
@@ -217,24 +434,39 @@ function AdvisoriesPage() {
                       </Link>
                     </td>
 
-                    <td>{advisory.organization}</td>
+                    <td>
+                      {advisory.organization}
+                    </td>
 
                     <td>
                       <span
                         className={`severity-badge ${
-                          advisory.severity ?? "unknown"
+                          advisory.severity ??
+                          "unknown"
                         }`}
                       >
-                        {advisory.severity ?? "unknown"}
+                        {advisory.severity ??
+                          "unknown"}
                       </span>
                     </td>
 
-                    <td>{advisory.cve ?? "—"}</td>
-                    <td>{advisory.product ?? "—"}</td>
+                    <td>
+                      {advisory.cve ?? "—"}
+                    </td>
+
+                    <td>
+                      {advisory.product ?? "—"}
+                    </td>
 
                     <td>
                       {formatDateTime(
                         advisory.publication_date,
+                      )}
+                    </td>
+
+                    <td>
+                      {formatDateTime(
+                        advisory.collection_date,
                       )}
                     </td>
                   </tr>
@@ -246,17 +478,24 @@ function AdvisoriesPage() {
           <div className="pagination">
             <button
               type="button"
-              disabled={page === 1 || isLoading}
+              disabled={
+                page === 1 || isLoading
+              }
               onClick={() => {
                 setPage((currentPage) =>
-                  Math.max(1, currentPage - 1),
+                  Math.max(
+                    1,
+                    currentPage - 1,
+                  ),
                 );
               }}
             >
               Previous
             </button>
 
-            <span>Page {page}</span>
+            <span>
+              Page {page}
+            </span>
 
             <button
               type="button"
@@ -265,7 +504,10 @@ function AdvisoriesPage() {
                 advisories.length < PAGE_SIZE
               }
               onClick={() => {
-                setPage((currentPage) => currentPage + 1);
+                setPage(
+                  (currentPage) =>
+                    currentPage + 1,
+                );
               }}
             >
               Next

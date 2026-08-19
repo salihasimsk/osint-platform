@@ -24,3 +24,14 @@ export function startCrawl(
     body: JSON.stringify(request),
   });
 }
+
+export function stopCrawl(
+  jobId: string,
+): Promise<CrawlJob> {
+  return apiRequest<CrawlJob>(
+    `/crawls/${encodeURIComponent(jobId)}/stop`,
+    {
+      method: "POST",
+    },
+  );
+}

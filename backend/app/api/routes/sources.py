@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.schemas.source import SourceCreate, SourceResponse
 from app.services import source_service
+from app.crawler.robots import can_crawl
 
 router = APIRouter()
 
@@ -30,3 +31,20 @@ def update_source_status(source_id: int, enabled: bool, db: Session = Depends(ge
 @router.delete("/sources/{source_id}")
 def delete_source(source_id: int, db: Session = Depends(get_db)):
     return source_service.delete_source(db, source_id)
+
+@router.get("/sources/{source_id}/robots")
+def get_source_robots_status(
+    source_id: int,
+    db: Session = Depends(get_db),
+):
+    source = source_service.get_source(
+        db,
+        source_id,
+    )
+
+    allowed = can_crawl(source.base_url)
+
+    return {
+        "source_id": source.id,
+        "allowed": allowed,
+    }

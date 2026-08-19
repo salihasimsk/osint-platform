@@ -10,10 +10,19 @@ import type { CrawlJob, Source } from "../types";
 
 function NewCrawlPage() {
   const [sources, setSources] = useState<Source[]>([]);
+
   const [selectedSourceIds, setSelectedSourceIds] =
     useState<number[]>([]);
 
-  const [maximumPages, setMaximumPages] = useState(1);
+  const [maximumPages, setMaximumPages] =
+    useState(1);
+
+  const [dateFrom, setDateFrom] =
+    useState("");
+
+  const [keywords, setKeywords] =
+    useState("");
+
   const [createdJob, setCreatedJob] =
     useState<CrawlJob | null>(null);
 
@@ -30,14 +39,18 @@ function NewCrawlPage() {
     getSources()
       .then((data) => {
         setSources(
-          data.filter((source) => source.enabled_status),
+          data.filter(
+            (source) => source.enabled_status,
+          ),
         );
       })
       .catch((requestError: unknown) => {
         if (requestError instanceof Error) {
           setError(requestError.message);
         } else {
-          setError("Could not load sources.");
+          setError(
+            "Could not load sources.",
+          );
         }
       })
       .finally(() => {
@@ -45,13 +58,20 @@ function NewCrawlPage() {
       });
   }, []);
 
-  function toggleSource(sourceId: number) {
+  function toggleSource(
+    sourceId: number,
+  ) {
     setSelectedSourceIds((currentIds) => {
       if (currentIds.includes(sourceId)) {
-        return currentIds.filter((id) => id !== sourceId);
+        return currentIds.filter(
+          (id) => id !== sourceId,
+        );
       }
 
-      return [...currentIds, sourceId];
+      return [
+        ...currentIds,
+        sourceId,
+      ];
     });
   }
 
@@ -59,13 +79,31 @@ function NewCrawlPage() {
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+
     setError(null);
     setCreatedJob(null);
 
     if (selectedSourceIds.length === 0) {
-      setError("Select at least one source.");
+      setError(
+        "Select at least one source.",
+      );
       return;
     }
+
+    if (
+      maximumPages < 1 ||
+      maximumPages > 100
+    ) {
+      setError(
+        "Maximum pages must be between 1 and 100.",
+      );
+      return;
+    }
+
+    const keywordList = keywords
+      .split(",")
+      .map((keyword) => keyword.trim())
+      .filter((keyword) => keyword.length > 0);
 
     setIsSubmitting(true);
 
@@ -73,6 +111,12 @@ function NewCrawlPage() {
       const job = await startCrawl({
         source_ids: selectedSourceIds,
         maximum_pages: maximumPages,
+        date_from:
+          dateFrom || null,
+        keywords:
+          keywordList.length > 0
+            ? keywordList
+            : null,
       });
 
       setCreatedJob(job);
@@ -80,7 +124,9 @@ function NewCrawlPage() {
       if (requestError instanceof Error) {
         setError(requestError.message);
       } else {
-        setError("Could not start the crawl.");
+        setError(
+          "Could not start the crawl.",
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -92,17 +138,30 @@ function NewCrawlPage() {
       <header className="page-header">
         <div>
           <h1>New Crawl</h1>
+
           <p>
-            Select approved sources and start a crawl job.
+            Select approved sources and
+            configure the crawl.
           </p>
         </div>
       </header>
 
-      <form className="crawl-form" onSubmit={handleSubmit}>
-        <fieldset disabled={isSubmitting}>
-          <legend>Sources</legend>
+      <form
+        className="crawl-form"
+        onSubmit={handleSubmit}
+      >
+        <fieldset
+          disabled={isSubmitting}
+        >
+          <legend>
+            Sources
+          </legend>
 
-          {isLoadingSources && <p>Loading sources...</p>}
+          {isLoadingSources && (
+            <p>
+              Loading sources...
+            </p>
+          )}
 
           {!isLoadingSources &&
             sources.map((source) => (
@@ -112,16 +171,24 @@ function NewCrawlPage() {
               >
                 <input
                   type="checkbox"
-                  checked={selectedSourceIds.includes(
-                    source.id,
-                  )}
-                  onChange={() => toggleSource(source.id)}
+                  checked={
+                    selectedSourceIds.includes(
+                      source.id,
+                    )
+                  }
+                  onChange={() =>
+                    toggleSource(source.id)
+                  }
                 />
 
                 <span>
-                  <strong>{source.name}</strong>
+                  <strong>
+                    {source.name}
+                  </strong>
+
                   <small>
-                    Request delay: {source.request_delay}
+                    Request delay:{" "}
+                    {source.request_delay}
                     {" seconds"}
                   </small>
                 </span>
@@ -130,7 +197,49 @@ function NewCrawlPage() {
         </fieldset>
 
         <label className="form-field">
-          <span>Maximum pages per source</span>
+          <span>
+            Starting date
+          </span>
+
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(event) => {
+              setDateFrom(
+                event.target.value,
+              );
+            }}
+            disabled={isSubmitting}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>
+            Keywords
+          </span>
+
+          <input
+            type="text"
+            value={keywords}
+            placeholder="critical, kernel, remote code execution"
+            onChange={(event) => {
+              setKeywords(
+                event.target.value,
+              );
+            }}
+            disabled={isSubmitting}
+          />
+
+          <small>
+            Separate multiple keywords
+            with commas.
+          </small>
+        </label>
+
+        <label className="form-field">
+          <span>
+            Maximum pages per source
+          </span>
 
           <input
             type="number"
@@ -138,14 +247,21 @@ function NewCrawlPage() {
             max="100"
             value={maximumPages}
             onChange={(event) => {
-              setMaximumPages(Number(event.target.value));
+              setMaximumPages(
+                Number(
+                  event.target.value,
+                ),
+              );
             }}
             disabled={isSubmitting}
           />
         </label>
 
         {error && (
-          <p className="error-message" role="alert">
+          <p
+            className="error-message"
+            role="alert"
+          >
             {error}
           </p>
         )}
@@ -159,15 +275,25 @@ function NewCrawlPage() {
             selectedSourceIds.length === 0
           }
         >
-          {isSubmitting ? "Starting..." : "Start Crawl"}
+          {isSubmitting
+            ? "Starting..."
+            : "Start Crawl"}
         </button>
       </form>
 
       {createdJob && (
         <section className="success-message">
-          <h2>Crawl created</h2>
-          <p>Job ID: {createdJob.job_id}</p>
-          <p>Status: {createdJob.status}</p>
+          <h2>
+            Crawl created
+          </h2>
+
+          <p>
+            Job ID: {createdJob.job_id}
+          </p>
+
+          <p>
+            Status: {createdJob.status}
+          </p>
         </section>
       )}
     </section>

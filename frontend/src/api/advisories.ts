@@ -45,3 +45,25 @@ export function getAdvisory(
     `/advisories/${advisoryId}`,
   );
 }
+
+export function getAdvisoriesCsvUrl(
+  filters: AdvisoryFilters = {},
+): string {
+  const query = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      query.set(key, String(value));
+    }
+  });
+
+  const queryString = query.toString();
+
+  return queryString
+    ? `/api/advisories/export/csv?${queryString}`
+    : "/api/advisories/export/csv";
+}

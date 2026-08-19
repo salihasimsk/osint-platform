@@ -121,6 +121,92 @@ def get_advisories(
     return query.offset(offset).limit(
         page_size
     ).all()
+    
+def get_advisories_for_export(
+    db: Session,
+    severity=None,
+    organization=None,
+    keyword=None,
+    source_domain=None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort_by="publication_date",
+    sort_order="desc",
+):
+    query = db.query(Advisory)
+
+    if severity:
+        query = query.filter(
+            func.lower(Advisory.severity) == severity.lower()
+        )
+
+    if organization:
+        query = query.filter(
+            func.lower(Advisory.organization) == organization.lower()
+        )
+
+    if source_domain:
+        query = query.filter(
+            func.lower(Advisory.source_domain) == source_domain.lower()
+        )
+
+    if keyword:
+        search_pattern = f"%{keyword.strip()}%"
+
+        query = query.filter(
+            or_(
+                Advisory.title.ilike(search_pattern),
+                Advisory.summary.ilike(search_pattern),
+                Advisory.cve.ilike(search_pattern),
+                Advisory.product.ilike(search_pattern),
+            )
+        )
+
+    if date_from:
+        start_datetime = datetime.combine(
+            date_from,
+            time.min,
+        )
+
+        query = query.filter(
+            Advisory.publication_date >= start_datetime
+        )
+
+    if date_to:
+        end_datetime = datetime.combine(
+            date_to,
+            time.max,
+        )
+
+        query = query.filter(
+            Advisory.publication_date <= end_datetime
+        )
+
+    sort_columns = {
+        "publication_date": Advisory.publication_date,
+        "collection_date": Advisory.collection_date,
+        "title": Advisory.title,
+        "organization": Advisory.organization,
+        "severity": Advisory.severity,
+    }
+
+    sort_column = sort_columns.get(
+        sort_by,
+        Advisory.publication_date,
+    )
+
+    if sort_order == "asc":
+        query = query.order_by(
+            sort_column.asc(),
+            Advisory.id.asc(),
+        )
+    else:
+        query = query.order_by(
+            sort_column.desc(),
+            Advisory.id.desc(),
+        )
+
+    return query.all()
 
 def get_advisory_by_id(db: Session, advisory_id: int):
     return db.query(Advisory).filter(Advisory.id == advisory_id).first()

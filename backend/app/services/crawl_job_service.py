@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -95,28 +95,90 @@ def get_parser_for_source(source):
     else:
         raise ValueError(f"No parser available for source: {source.base_url}")
 
-def get_crawl_url_for_source(source):
+def get_crawl_url_for_source(
+    source,
+    date_from: date | None = None,
+):
     base_url = source.base_url
     parsed_url = urlparse(base_url)
-    query_params = parse_qs(parsed_url.query)
+    query_params = parse_qs(
+        parsed_url.query
+    )
 
-    if "services.nvd.nist.gov" in base_url:
-        end_date = datetime.now(timezone.utc)
-        start_date = end_date - timedelta(days=7)
+    end_date = datetime.now(
+        timezone.utc
+    )
 
-        query_params["resultsPerPage"] = ["10"]
-        query_params["pubStartDate"] = [
-            start_date.isoformat(timespec="milliseconds")
+    if (
+        "services.nvd.nist.gov"
+        in base_url
+    ):
+        if date_from:
+            start_date = datetime(
+                date_from.year,
+                date_from.month,
+                date_from.day,
+                tzinfo=timezone.utc,
+            )
+        else:
+            start_date = (
+                end_date
+                - timedelta(days=7)
+            )
+
+        query_params[
+            "resultsPerPage"
+        ] = ["10"]
+
+        query_params[
+            "pubStartDate"
+        ] = [
+            start_date.isoformat(
+                timespec="milliseconds"
+            )
         ]
-        query_params["pubEndDate"] = [
-            end_date.isoformat(timespec="milliseconds")
+
+        query_params[
+            "pubEndDate"
+        ] = [
+            end_date.isoformat(
+                timespec="milliseconds"
+            )
         ]
 
-    elif "access.redhat.com" in base_url:
-        query_params["created_days_ago"] = ["30"]
-        query_params["per_page"] = ["10"]
-        query_params["page"] = ["1"]
-        query_params["isCompressed"] = ["false"]
+    elif (
+        "access.redhat.com"
+        in base_url
+    ):
+        if date_from:
+            today = end_date.date()
+
+            days_ago = (
+                today - date_from
+            ).days
+
+            days_ago = max(
+                0,
+                days_ago,
+            )
+        else:
+            days_ago = 30
+
+        query_params[
+            "created_days_ago"
+        ] = [str(days_ago)]
+
+        query_params[
+            "per_page"
+        ] = ["10"]
+
+        query_params[
+            "page"
+        ] = ["1"]
+
+        query_params[
+            "isCompressed"
+        ] = ["false"]
 
     else:
         return base_url
@@ -127,15 +189,34 @@ def get_crawl_url_for_source(source):
     )
 
     return urlunparse(
-        parsed_url._replace(query=new_query)
+        parsed_url._replace(
+            query=new_query
+        )
+    )
+    
+
+def run_crawl(
+    db,
+    source,
+    crawl_job_id,
+    max_pages=3,
+    date_from: date | None = None,
+    keywords: list[str] | None = None,
+):
+    parser = get_parser_for_source(
+        source
     )
 
-def run_crawl(db, source, crawl_job_id, max_pages=3):
-    parser = get_parser_for_source(source)
-    crawl_url = get_crawl_url_for_source(source)
+    crawl_url = (
+        get_crawl_url_for_source(
+            source,
+            date_from=date_from,
+        )
+    )
 
     engine = CrawlerEngine(
-        request_delay=source.request_delay
+        request_delay=
+        source.request_delay
     )
 
     collected = engine.crawl(
@@ -144,38 +225,140 @@ def run_crawl(db, source, crawl_job_id, max_pages=3):
         max_pages=max_pages,
     )
 
+    filtered = []
+
+    normalized_keywords = [
+        keyword.strip().lower()
+        for keyword in (keywords or [])
+        if keyword.strip()
+    ]
+
+    for advisory_data in collected:
+        publication_date = (
+            advisory_repository
+            .parse_date(
+                advisory_data.get(
+                    "publication_date"
+                )
+            )
+        )
+
+        if (
+            date_from
+            and publication_date
+            and publication_date.date()
+            < date_from
+        ):
+            continue
+
+        if normalized_keywords:
+            searchable_text = " ".join(
+                str(
+                    advisory_data.get(
+                        field
+                    )
+                    or ""
+                )
+                for field in (
+                    "title",
+                    "summary",
+                    "cve",
+                    "product",
+                    "severity",
+                    "organization",
+                )
+            ).lower()
+
+            if not any(
+                keyword
+                in searchable_text
+                for keyword
+                in normalized_keywords
+            ):
+                continue
+
+        filtered.append(
+            advisory_data
+        )
+
     saved_count = 0
     skipped_count = 0
 
-    for advisory_data in collected:
-        advisory_data["crawl_job_id"] = crawl_job_id
+    for advisory_data in filtered:
+        advisory_data[
+            "crawl_job_id"
+        ] = crawl_job_id
 
-        # If the advisory has no CVE yet, try to fetch it from the detail page
-        if not advisory_data.get("cve") and hasattr(parser, "parse_detail"):
-            detail_html = engine.fetch_page(advisory_data["url"])
+        if (
+            not advisory_data.get("cve")
+            and hasattr(
+                parser,
+                "parse_detail",
+            )
+        ):
+            detail_html = (
+                engine.fetch_page(
+                    advisory_data["url"]
+                )
+            )
+
             if detail_html:
-                detail_data = parser.parse_detail(detail_html)
-                advisory_data["cve"] = detail_data.get("cve")
+                detail_data = (
+                    parser.parse_detail(
+                        detail_html
+                    )
+                )
 
-        existing = advisory_repository.get_advisory_by_url(db, advisory_data["url"])
+                advisory_data[
+                    "cve"
+                ] = detail_data.get(
+                    "cve"
+                )
+
+        existing = (
+            advisory_repository
+            .get_advisory_by_url(
+                db,
+                advisory_data["url"],
+            )
+        )
+
         if existing:
-            advisory_repository.update_advisory_from_crawl(db, existing, advisory_data)
+            advisory_repository \
+                .update_advisory_from_crawl(
+                    db,
+                    existing,
+                    advisory_data,
+                )
+
             skipped_count += 1
             continue
-        advisory_repository.create_advisory(db, advisory_data)
+
+        advisory_repository \
+            .create_advisory(
+                db,
+                advisory_data,
+            )
+
         saved_count += 1
 
     return {
-        "pages_visited": engine.pages_visited,
-        "collected": len(collected),
-        "saved": saved_count,
-        "skipped": skipped_count,
+        "pages_visited":
+            engine.pages_visited,
+        "collected":
+            len(filtered),
+        "saved":
+            saved_count,
+        "skipped":
+            skipped_count,
     }
 
 def execute_crawl_job(
     job_id: str,
     source_ids: list[int],
     max_pages: int = 3,
+    date_from: date | None = None,
+    keywords: list[str] | None = None,
 ):
     from app.database.database import SessionLocal
 
@@ -257,6 +440,8 @@ def execute_crawl_job(
                         source=source,
                         crawl_job_id=job.id,
                         max_pages=max_pages,
+                        date_from=date_from,
+                        keywords=keywords,
                     )
 
                     total_pages += result[

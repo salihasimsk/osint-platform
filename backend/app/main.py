@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from app.api.routes import health, sources,advisories,crawls,logs,statistics
 from app.database.database import Base, engine
+from app.database.seed import seed_sources
 from app.models import source, advisory,crawl_job
 from fastapi.middleware.cors import CORSMiddleware
 
 Base.metadata.create_all(bind=engine)
+seed_sources()
 
 app = FastAPI(title="OSINT Web Crawler API")
 

@@ -50,3 +50,19 @@ def update_last_crawl_date(db, source):
     db.commit()
     db.refresh(source)
     return source
+
+def get_source_by_base_url(
+    db: Session,
+    base_url: str,
+):
+    sources = db.query(Source).all()
+
+    normalized_url = base_url.rstrip("/").lower()
+
+    for source in sources:
+        existing_url = source.base_url.rstrip("/").lower()
+
+        if existing_url == normalized_url:
+            return source
+
+    return None

@@ -35,16 +35,19 @@ def test_start_crawl(monkeypatch):
         lambda db, crawl: make_job(),
     )
 
-    def fake_execute(
-        job_id,
-        source_ids,
-        maximum_pages,
-    ):
-        executed_tasks.append({
-            "job_id": job_id,
-            "source_ids": source_ids,
-            "maximum_pages": maximum_pages,
-        })
+def fake_execute_crawl(
+    job_id,
+    source_ids,
+    max_pages,
+    date_from=None,
+    keywords=None,
+):
+    return None
+    executed_tasks.append({
+        "job_id": job_id,
+        "source_ids": source_ids,
+        "maximum_pages": maximum_pages,
+    })
 
     monkeypatch.setattr(
         crawl_job_service,

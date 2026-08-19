@@ -57,3 +57,36 @@ def delete_advisory(db: Session, advisory_id: int):
         raise HTTPException(status_code=404, detail="Advisory not found")
     advisory_repository.delete_advisory(db, advisory)
     return {"message": "Advisory deleted successfully"}
+
+def export_advisories(
+    db: Session,
+    severity=None,
+    organization=None,
+    keyword=None,
+    source_domain=None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort_by="publication_date",
+    sort_order="desc",
+):
+    if (
+        date_from
+        and date_to
+        and date_from > date_to
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="date_from cannot be later than date_to",
+        )
+
+    return advisory_repository.get_advisories_for_export(
+        db,
+        severity=severity,
+        organization=organization,
+        keyword=keyword,
+        source_domain=source_domain,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
